@@ -363,15 +363,13 @@ def valid_port(port):
 
 def load_old_data():
     """
-    返回结构：
-    {
-        "HK": {
-            "1.2.3.4:443": "1.2.3.4:443#HK香港,Cloudflare"
-        },
-        "TR": {
-            ...
-        }
-    }
+    读取现有 Data/*.txt 历史节点。
+
+    历史文件即使还是旧格式：
+    IP:PORT#地区码中文名,运营商
+
+    也会在本次运行时自动清洗成：
+    IP:PORT#地区码中文名
 
     以 IP:端口 为唯一键。
     """
@@ -382,7 +380,7 @@ def load_old_data():
         print("Data 目录不存在，视为首次生成。")
         return regions
 
-    print("正在读取历史地区文件...")
+    print("正在读取并清洗历史地区文件...")
 
     file_count = 0
     node_count = 0
@@ -393,6 +391,8 @@ def load_old_data():
             continue
 
         code = path.stem.upper()
+        country_name = COUNTRIES.get(code, "未知地区")
+
         regions.setdefault(code, {})
         file_count += 1
 
@@ -408,8 +408,6 @@ def load_old_data():
                 if not line:
                     continue
 
-                # 格式：
-                # IP:PORT#地区代码中文名,运营商
                 if "#" not in line:
                     continue
 
@@ -418,7 +416,11 @@ def load_old_data():
                 if not address:
                     continue
 
-                regions[code][address] = line
+                # 无论旧行后面有没有运营商信息，
+                # 都统一改成 IP:PORT#地区码中文名
+                clean_line = f"{address}#{code}{country_name}"
+
+                regions[code][address] = clean_line
                 node_count += 1
 
         except Exception as e:
@@ -440,12 +442,14 @@ def load_new_data():
     """
     读取新的 alive.txt。
 
-    返回：
-    {
-        "HK": {
-            "1.2.3.4:443": "1.2.3.4:443#HK香港,Cloudflare"
-        }
-    }
+    上游格式：
+    IP,端口,地区码,运营商
+
+    输出格式：
+    IP:端口#地区码中文地区名
+
+    例如：
+    103.30.211.34:443#AU澳大利亚
     """
 
     regions = {}
@@ -475,17 +479,6 @@ def load_new_data():
             port = row[1].strip()
             code = row[2].strip().upper()
 
-            # 第 4 列开始全部视为运营商信息，
-            # 防止运营商名称中本身存在逗号。
-            provider = ""
-
-            if len(row) >= 4:
-                provider = ",".join(
-                    item.strip()
-                    for item in row[3:]
-                    if item.strip()
-                )
-
             if not ip:
                 invalid_count += 1
                 continue
@@ -505,21 +498,11 @@ def load_new_data():
                 "未知地区",
             )
 
-            if provider:
-                line = (
-                    f"{address}"
-                    f"#{code}{country_name},"
-                    f"{provider}"
-                )
-            else:
-                line = (
-                    f"{address}"
-                    f"#{code}{country_name}"
-                )
+            line = f"{address}#{code}{country_name}"
 
             regions.setdefault(code, {})
 
-            # 同一次上游内如果重复，自动去重
+            # 同一次上游内如果重复，按 IP:端口 自动去重
             regions[code][address] = line
 
             valid_count += 1
@@ -544,7 +527,7 @@ def merge_data(old_regions, new_regions):
 
     新数据：
     - 不存在 → 新增
-    - IP:端口 已存在，但信息变化 → 更新成上游新信息
+    - IP:端口 已存在 → 保留统一后的新格式
     - 上游本次没有出现 → 旧数据仍保留
     """
 
@@ -571,8 +554,7 @@ def merge_data(old_regions, new_regions):
                 old_line = merged[code][address]
 
                 if old_line != new_line:
-                    # 相同 IP:端口信息变化：
-                    # 以本次上游信息为准
+                    # 相同 IP:端口格式变化时，以新格式为准
                     merged[code][address] = new_line
                     updated_count += 1
                 else:
