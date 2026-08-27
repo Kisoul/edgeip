@@ -1,10 +1,10 @@
-155.212.244.252:443#BY白俄罗斯,Yedinyye Resheniya LLC
-185.179.82.201:443#BY白俄罗斯,Reliable Software Ltd
-185.179.82.246:443#BY白俄罗斯,Reliable Software Ltd
-191.44.32.253:443#BY白俄罗斯,SPRINTHOST LLP
-212.60.4.134:443#BY白俄罗斯,SPRINTHOST LLP
-62.182.102.24:443#BY白俄罗斯,Yedinyye Resheniya LLC
-91.149.167.147:8443#BY白俄罗斯,Besthostby network
-93.85.236.9:443#BY白俄罗斯,Abonent MGTS
-95.130.84.36:8443#BY白俄罗斯,LLC Raccoon technology
-95.130.84.36:2053#BY白俄罗斯,LLC Raccoon technology
+155.212.244.252:443#BY白俄罗斯
+185.179.82.201:443#BY白俄罗斯
+185.179.82.246:443#BY白俄罗斯
+191.44.32.253:443#BY白俄罗斯
+212.60.4.134:443#BY白俄罗斯
+62.182.102.24:443#BY白俄罗斯
+91.149.167.147:8443#BY白俄罗斯
+93.85.236.9:443#BY白俄罗斯
+95.130.84.36:2053#BY白俄罗斯
+95.130.84.36:8443#BY白俄罗斯
