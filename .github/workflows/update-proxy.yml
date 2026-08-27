@@ -1,0 +1,54 @@
+name: Update Proxy IP
+
+on:
+  schedule:
+    # 每12小时运行一次
+    # UTC 00:00 / 12:00
+    # 北京时间 08:00 / 20:00
+    - cron: '0 */12 * * *'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run proxy formatter
+        run: |
+          python3 script/format_proxy.py
+
+      - name: Check upstream changes
+        id: check
+        run: |
+          if [ "$(cat changed.txt)" = "true" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit new proxy files
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A Data
+          git add .cache/alive.sha256
+
+          if git diff --cached --quiet; then
+            echo "没有需要提交的变化"
+            exit 0
+          fi
+
+          git commit -m "Auto update proxy IP"
+          git push
