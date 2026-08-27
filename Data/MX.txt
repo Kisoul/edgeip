@@ -1,0 +1,8 @@
+131.196.253.141:443#MX墨西哥,Truxgo S de RL de CV
+131.196.254.151:443#MX墨西哥,Truxgo S de RL de CV
+148.223.138.11:443#MX墨西哥,Uninet S A de CV
+201.149.15.14:21585#MX墨西哥,Megacable Comunicaciones de Mexico SA de CV
+216.238.78.167:443#MX墨西哥,The Constant Company LLC
+216.238.79.83:8443#MX墨西哥,The Constant Company LLC
+216.238.80.148:8443#MX墨西哥,The Constant Company LLC
+216.238.86.91:443#MX墨西哥,The Constant Company LLC

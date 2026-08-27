@@ -1,0 +1,8 @@
+185.186.77.54:443#AL阿尔巴尼亚,oneprovidercom  Tirana infrastructure
+193.108.112.248:443#AL阿尔巴尼亚,Baxet Group Inc
+193.108.112.65:443#AL阿尔巴尼亚,Baxet Group Inc
+87.121.162.73:443#AL阿尔巴尼亚,AlbHost SHPK
+89.125.139.115:443#AL阿尔巴尼亚,Baxet Group Inc
+91.239.6.40:443#AL阿尔巴尼亚,HostAL Shpk
+91.239.6.51:8443#AL阿尔巴尼亚,HostAL Shpk
+93.123.113.47:443#AL阿尔巴尼亚,Albanian Hosting SHPK ta AlbHost SHPK
