@@ -28,7 +28,7 @@ jobs:
           import os
           
           # 读取原始文件
-          with open('Data/HK.txt', 'r', encoding='utf-8') as f:
+          with open('Data/Google/HK.txt', 'r', encoding='utf-8') as f:
               lines = f.readlines()
 
           # 筛选包含 ':443' 的行，去除空白字符
