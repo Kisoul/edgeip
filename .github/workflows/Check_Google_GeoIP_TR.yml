@@ -3,7 +3,7 @@ name: Check Google GeoIP and Filter TR
 on:
   workflow_dispatch: 
   schedule:
-    - cron: '0 1 * * *' # 每天北京时间早上 9:00 运行 (UTC 01:00)
+    - cron: '0 1 * * *' 
 
 jobs:
   check-ips:
@@ -14,33 +14,25 @@ jobs:
 
       - name: Check IP Location via YouTube and Filter TR
         run: |
-          # 创建存放结果的目录
           mkdir -p Data/Google
-          # 清空或初始化目标文件
           > Data/Google/TR.txt
           
-          # 读取你的源文件
           cat Data/TR.txt | while read line || [[ -n $line ]]; do
             
-            # 提取 IP:端口 用于测试
+            # 提取 IP:端口
             ip_port=$(echo "$line" | awk -F'#' '{print $1}')
-            ip=$(echo "$ip_port" | cut -d':' -f1)
             
-            # 如果空行则跳过
             if [ -z "$ip_port" ]; then
               continue
             fi
 
             echo "正在测试: $ip_port ..."
             
-            # 获取实际返回的 HTTP 状态码和内容头部，排查被拦截原因
-            # 加上了 -i 参数获取头部，-A 参数伪装成电脑浏览器，超时延长到 15 秒
-            response=$(curl -s -i -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com || true)
+            # 【关键修改】使用 -x 参数（代理模式）代替 --resolve，这样就能原封不动地请求你列表里特定的端口(如 8443, 2053 等)
+            response=$(curl -s -i -m 15 -x "http://$ip_port" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" https://www.youtube.com || true)
             
-            # 提取 HTTP 状态码 (从第一行提取，如 HTTP/2 200)
-            http_code=$(echo "$response" | head -n 1 | awk '{print $2}')
-            # 提取里面的 \r 回车符防止格式错误
-            http_code=$(echo "$http_code" | tr -d '\r')
+            # 修复 Broken pipe 错误，安全提取状态码
+            http_code=$(echo "$response" | awk 'NR==1 {print $2}' | tr -d '\r')
             
             # 提取 GL 地区代码
             region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
@@ -48,17 +40,15 @@ jobs:
             if [ -n "$region" ]; then
               echo "✅ $ip_port -> 成功! 地区: $region (状态码: $http_code)"
               
-              # 判断如果识别结果是 TR，则将整行写入到目标文件
               if [ "$region" == "TR" ]; then
                 echo "$line" >> Data/Google/TR.txt
               fi
               
             else
-              # 如果没有解析到地区，打印状态码看看是 403(被拦截) 还是空(超时)
               if [ -z "$http_code" ]; then
                 echo "❌ $ip_port -> 彻底超时无响应"
               elif [ "$http_code" == "403" ]; then
-                echo "🚫 $ip_port -> 被 Cloudflare/Google 防火墙拦截 (403 Forbidden)"
+                echo "🚫 $ip_port -> 被防火墙拦截 (403 Forbidden)"
               else
                 echo "⚠️ $ip_port -> 请求失败，状态码: $http_code"
               fi
@@ -75,12 +65,6 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
-          # 将生成的文件添加到 git 暂存区
           git add Data/Google/TR.txt
-          
-          # 提交更改 (如果没有更改则不会报错并继续)
           git commit -m "Auto updated Google TR IPs" || exit 0
-          
-          # 推送到仓库
           git push
