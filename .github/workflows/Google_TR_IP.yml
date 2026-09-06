@@ -30,14 +30,14 @@ jobs:
           UUID="8bfae153-9f0f-443d-8231-a4bffa7064ac"  
           SNI="edge.ileyee.com"                         
           HOST="edge.ileyee.com"                        
-          PATH="/?ed=2560"                                
+          WS_PATH="/?ed=2560"    # 修复：重命名为 WS_PATH，绝对不再冲突系统变量！                             
           # ==========================================
           
           while read -r line || [[ -n $line ]]; do
-            # 终极修复：使用 Bash 原生字符串截取，彻底告别 awk 和 cut！
-            ip_port="${line%%#*}"    # 截掉 # 和后面的内容
-            ip="${ip_port%:*}"       # 截取 : 前面的 IP
-            port="${ip_port##*:}"    # 截取 : 后面的端口
+            # 恢复干净整洁的截取方式
+            ip_port=$(echo "$line" | cut -d'#' -f1)
+            ip=$(echo "$ip_port" | cut -d':' -f1)
+            port=$(echo "$ip_port" | cut -d':' -f2)
             
             if [ -z "$ip" ] || [ -z "$port" ]; then
               continue
@@ -46,7 +46,7 @@ jobs:
             echo "----------------------------------------"
             echo "正在启动 Xray 测试: $ip_port ..."
             
-            # 使用 echo 写入双引号转义的 JSON 配置
+            # 使用 echo 写入配置，将原本的 $PATH 替换为 $WS_PATH
             echo "{
               \"inbounds\": [{
                 \"port\": 10808,
@@ -68,7 +68,7 @@ jobs:
                   \"security\": \"tls\",
                   \"tlsSettings\": { \"serverName\": \"$SNI\" },
                   \"wsSettings\": {
-                    \"path\": \"$PATH\",
+                    \"path\": \"$WS_PATH\",
                     \"headers\": { \"Host\": \"$HOST\" }
                   }
                 }
@@ -79,21 +79,15 @@ jobs:
             ./xray/xray -c config.json > /dev/null 2>&1 &
             XRAY_PID=$!
             
-            # 等待 2 秒让 Xray 启动并建立连接
+            # 等待 2 秒让 Xray 启动并建立连接 (现在 sleep 绝对能找到了)
             sleep 2 
             
-            # 使用 curl 访问
+            # 使用 curl 访问 YouTube
             response=$(curl -s -i -m 10 -x socks5h://127.0.0.1:10808 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.youtube.com || true)
             
-            # 终极修复：使用 Bash 原生读取 HTTP 状态码，告别 head、cut 和 tr
-            read -r proto http_code rest <<< "$response"
-            http_code="${http_code%$'\r'}"
-            
-            # 终极修复：使用 Bash 原生正则表达式提取 GL 地区，告别 grep
-            region=""
-            if [[ "$response" =~ \"GL\":\"([^\"]+)\" ]]; then
-              region="${BASH_REMATCH[1]}"
-            fi
+            # 提取状态码和归属地
+            http_code=$(echo "$response" | head -n 1 | cut -d' ' -f2 | tr -d '\r')
+            region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
 
             if [ -n "$region" ]; then
               echo "✅ $ip_port -> 成功! Google 识别地区: $region (状态码: $http_code)"
