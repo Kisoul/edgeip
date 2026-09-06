@@ -35,7 +35,7 @@ jobs:
             
             # 获取实际返回的 HTTP 状态码和内容头部，排查被拦截原因
             # 加上了 -i 参数获取头部，-A 参数伪装成电脑浏览器，超时延长到 15 秒
-            response=$(curl -s -i -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com)
+            response=$(curl -s -i -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com || true)
             
             # 提取 HTTP 状态码 (从第一行提取，如 HTTP/2 200)
             http_code=$(echo "$response" | head -n 1 | awk '{print $2}')
