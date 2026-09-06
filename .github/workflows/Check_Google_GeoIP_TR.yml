@@ -33,19 +33,35 @@ jobs:
 
             echo "正在测试: $ip_port ..."
             
-            # 这里以优选IP（Cloudflare Edge IP）的测试方式为例（对应你图中的IP格式）
-            region=$(curl -s -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com | grep -oP '"GL":"\K[^"]+' | head -n 1)
+            # 获取实际返回的 HTTP 状态码和内容头部，排查被拦截原因
+            # 加上了 -i 参数获取头部，-A 参数伪装成电脑浏览器，超时延长到 15 秒
+            response=$(curl -s -i -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com)
+            
+            # 提取 HTTP 状态码 (从第一行提取，如 HTTP/2 200)
+            http_code=$(echo "$response" | head -n 1 | awk '{print $2}')
+            # 提取里面的 \r 回车符防止格式错误
+            http_code=$(echo "$http_code" | tr -d '\r')
+            
+            # 提取 GL 地区代码
+            region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
 
             if [ -n "$region" ]; then
-              echo "✅ $ip_port -> Google 识别地区: $region"
+              echo "✅ $ip_port -> 成功! 地区: $region (状态码: $http_code)"
               
-              # 【核心修改】判断如果识别结果是 TR，则将整行写入到目标文件
+              # 判断如果识别结果是 TR，则将整行写入到目标文件
               if [ "$region" == "TR" ]; then
                 echo "$line" >> Data/Google/TR.txt
               fi
               
             else
-              echo "❌ $ip_port -> 访问超时或无法解析地区"
+              # 如果没有解析到地区，打印状态码看看是 403(被拦截) 还是空(超时)
+              if [ -z "$http_code" ]; then
+                echo "❌ $ip_port -> 彻底超时无响应"
+              elif [ "$http_code" == "403" ]; then
+                echo "🚫 $ip_port -> 被 Cloudflare/Google 防火墙拦截 (403 Forbidden)"
+              else
+                echo "⚠️ $ip_port -> 请求失败，状态码: $http_code"
+              fi
             fi
             
           done
