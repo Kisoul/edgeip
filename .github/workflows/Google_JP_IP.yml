@@ -1,4 +1,4 @@
-name: Check Google GeoIP with Xray
+name: Check Google JP IP with Xray
 
 on:
   workflow_dispatch: 
