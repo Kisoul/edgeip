@@ -30,14 +30,14 @@ jobs:
           UUID="8bfae153-9f0f-443d-8231-a4bffa7064ac"  
           SNI="edge.ileyee.com"                         
           HOST="edge.ileyee.com"                        
-          PATH="/"                                
+          PATH="/?ed=2560"                                
           # ==========================================
           
-          while read line || [[ -n $line ]]; do
-            # 提取 IP 和 端口 (使用 cut 替代报错的 awk)
-            ip_port=$(echo "$line" | cut -d'#' -f1)
-            ip=$(echo "$ip_port" | cut -d':' -f1)
-            port=$(echo "$ip_port" | cut -d':' -f2)
+          while read -r line || [[ -n $line ]]; do
+            # 终极修复：使用 Bash 原生字符串截取，彻底告别 awk 和 cut！
+            ip_port="${line%%#*}"    # 截掉 # 和后面的内容
+            ip="${ip_port%:*}"       # 截取 : 前面的 IP
+            port="${ip_port##*:}"    # 截取 : 后面的端口
             
             if [ -z "$ip" ] || [ -z "$port" ]; then
               continue
@@ -82,12 +82,18 @@ jobs:
             # 等待 2 秒让 Xray 启动并建立连接
             sleep 2 
             
-            # 使用 curl 通过刚刚搭建的本地 socks5 代理访问 YouTube
+            # 使用 curl 访问
             response=$(curl -s -i -m 10 -x socks5h://127.0.0.1:10808 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.youtube.com || true)
             
-            # 使用 head 和 cut 替代报错的 awk
-            http_code=$(echo "$response" | head -n 1 | cut -d' ' -f2 | tr -d '\r')
-            region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
+            # 终极修复：使用 Bash 原生读取 HTTP 状态码，告别 head、cut 和 tr
+            read -r proto http_code rest <<< "$response"
+            http_code="${http_code%$'\r'}"
+            
+            # 终极修复：使用 Bash 原生正则表达式提取 GL 地区，告别 grep
+            region=""
+            if [[ "$response" =~ \"GL\":\"([^\"]+)\" ]]; then
+              region="${BASH_REMATCH[1]}"
+            fi
 
             if [ -n "$region" ]; then
               echo "✅ $ip_port -> 成功! Google 识别地区: $region (状态码: $http_code)"
