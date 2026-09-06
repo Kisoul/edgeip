@@ -1,0 +1,66 @@
+name: Daily Random Pick 443 SG-IPs
+
+# 触发条件
+on:
+  schedule:
+    # 每天 UTC 时间 00:00 (北京时间早上 8:00) 执行一次
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许在 Actions 页面手动点击运行，方便测试
+
+# 赋予 GitHub Actions 推送代码的权限
+permissions:
+  contents: write
+
+jobs:
+  pick-and-save:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 运行 Python 脚本筛选并抽取10个443端口的IP
+      - name: Pick random 10 IPs with port 443
+        run: |
+          python -c "
+          import random
+          import os
+          
+          # 读取原始文件
+          with open('Data/HK.txt', 'r', encoding='utf-8') as f:
+              lines = f.readlines()
+
+          # 筛选包含 ':443' 的行，去除空白字符
+          port_443_ips = [line.strip() for line in lines if ':443#' in line]
+
+          # 随机抽取 10 个（如果不足 10 个则全选）
+          selected_ips = random.sample(port_443_ips, min(10, len(port_443_ips)))
+
+          # 新增：创建目标目录（如果不存在）！！！
+          os.makedirs('Data/Random', exist_ok=True)
+
+          # 将结果写入新文件，例如保存为 Data/Random/SG-Random_443.txt
+          with open('Data/Random/SG-Random_443.txt', 'w', encoding='utf-8') as f:
+              if selected_ips:
+                  f.write('\n'.join(selected_ips) + '\n')
+              else:
+                  f.write('') # 处理空列表情况，防止报错
+          "
+
+      # 3. 提交并推送到仓库
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 添加新生成的文件
+          git add Data/Random/SG-Random_443.txt
+          
+          # 检查是否有文件改动，如果有则提交并推送
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update random 10 IPs with port 443"
+            git push
+          fi
