@@ -1,0 +1,121 @@
+name: Check Google GeoIP with Xray
+
+on:
+  workflow_dispatch: 
+  schedule:
+    - cron: '0 1 * * *' 
+
+jobs:
+  check-ips:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Xray Core
+        run: |
+          echo "下载 Xray 内核..."
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+          unzip -q Xray-linux-64.zip -d xray
+          chmod +x xray/xray
+
+      - name: Check IP Location via Xray and Filter TR
+        run: |
+          mkdir -p Data/Google
+          > Data/Google/SG.txt
+          
+          # ==========================================
+          # ⚠️⚠️⚠️ 请在这里填入你真实的节点信息 ⚠️⚠️⚠️
+          # ==========================================
+          UUID="8bfae153-9f0f-443d-8231-a4bffa7064ac"  
+          SNI="edge.ileyee.com"                         
+          HOST="edge.ileyee.com"                        
+          WS_PATH="/?ed=2560"    # 修复：重命名为 WS_PATH，绝对不再冲突系统变量！                             
+          # ==========================================
+          
+          while read -r line || [[ -n $line ]]; do
+            # 恢复干净整洁的截取方式
+            ip_port=$(echo "$line" | cut -d'#' -f1)
+            ip=$(echo "$ip_port" | cut -d':' -f1)
+            port=$(echo "$ip_port" | cut -d':' -f2)
+            
+            if [ -z "$ip" ] || [ -z "$port" ]; then
+              continue
+            fi
+
+            echo "----------------------------------------"
+            echo "正在启动 Xray 测试: $ip_port ..."
+            
+            # 使用 echo 写入配置，将原本的 $PATH 替换为 $WS_PATH
+            echo "{
+              \"inbounds\": [{
+                \"port\": 10808,
+                \"listen\": \"127.0.0.1\",
+                \"protocol\": \"socks\",
+                \"settings\": { \"udp\": true }
+              }],
+              \"outbounds\": [{
+                \"protocol\": \"vless\",
+                \"settings\": {
+                  \"vnext\": [{
+                    \"address\": \"$ip\",
+                    \"port\": $port,
+                    \"users\": [{\"id\": \"$UUID\", \"encryption\": \"none\"}]
+                  }]
+                },
+                \"streamSettings\": {
+                  \"network\": \"ws\",
+                  \"security\": \"tls\",
+                  \"tlsSettings\": { \"serverName\": \"$SNI\" },
+                  \"wsSettings\": {
+                    \"path\": \"$WS_PATH\",
+                    \"headers\": { \"Host\": \"$HOST\" }
+                  }
+                }
+              }]
+            }" > config.json
+
+            # 后台启动 Xray
+            ./xray/xray -c config.json > /dev/null 2>&1 &
+            XRAY_PID=$!
+            
+            # 等待 2 秒让 Xray 启动并建立连接 (现在 sleep 绝对能找到了)
+            sleep 2 
+            
+            # 使用 curl 访问 YouTube
+            response=$(curl -s -i -m 10 -x socks5h://127.0.0.1:10808 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.youtube.com || true)
+            
+            # 提取状态码和归属地
+            http_code=$(echo "$response" | head -n 1 | cut -d' ' -f2 | tr -d '\r')
+            region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
+
+            if [ -n "$region" ]; then
+              echo "✅ $ip_port -> 成功! Google 识别地区: $region (状态码: $http_code)"
+              if [ "$region" == "SG" ]; then
+                echo "$line" >> Data/Google/SG.txt
+              fi
+            else
+              if [ -z "$http_code" ]; then
+                echo "❌ $ip_port -> 测试失败: 代理不通或严重超时"
+              else
+                echo "⚠️ $ip_port -> 测试失败，HTTP 状态码: $http_code"
+              fi
+            fi
+            
+            # 测完杀掉 Xray 进程，准备测下一个
+            kill -9 $XRAY_PID 2>/dev/null || true
+            sleep 1
+          done < Data/SG.txt
+          
+      - name: Show Results
+        run: |
+          echo "==== 筛选出 Google 归属地为 SG 的节点 ===="
+          cat Data/Google/SG.txt
+
+      - name: Commit and Push Results
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add Data/Google/TR.txt
+          git commit -m "Auto updated Google SG IPs" || exit 0
+          git push
