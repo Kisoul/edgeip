@@ -369,7 +369,7 @@ def load_old_data():
     IP:PORT#地区码中文名,运营商
 
     也会在本次运行时自动清洗成：
-    IP:PORT#地区码中文名
+    IP:PORT#地区码中文名|IP
 
     以 IP:端口 为唯一键。
     """
@@ -412,13 +412,14 @@ def load_old_data():
                     continue
 
                 address = line.split("#", 1)[0].strip()
-
                 if not address:
                     continue
 
-                # 无论旧行后面有没有运营商信息，
-                # 都统一改成 IP:PORT#地区码中文名
-                clean_line = f"{address}#{code}{country_name}"
+                # 提取纯 IP (以冒号分割获取前半部分)
+                ip = address.split(":")[0]
+
+                # 统一改成新的格式：IP:PORT#地区码中文名|IP
+                clean_line = f"{address}#{code}{country_name}|{ip}"
 
                 regions[code][address] = clean_line
                 node_count += 1
@@ -446,10 +447,10 @@ def load_new_data():
     IP,端口,地区码,运营商
 
     输出格式：
-    IP:端口#地区码中文地区名
+    IP:端口#地区码中文地区名|IP
 
     例如：
-    103.30.211.34:443#AU澳大利亚
+    103.30.211.34:443#AU澳大利亚|103.30.211.34
     """
 
     regions = {}
@@ -498,7 +499,8 @@ def load_new_data():
                 "未知地区",
             )
 
-            line = f"{address}#{code}{country_name}"
+            # 统一改成新的格式：IP:PORT#地区码中文名|IP
+            line = f"{address}#{code}{country_name}|{ip}"
 
             regions.setdefault(code, {})
 
