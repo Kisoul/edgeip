@@ -25,7 +25,8 @@ jobs:
         run: |
           python -c "
           import random
-
+          import os
+          
           # 读取原始文件
           with open('Data/TR.txt', 'r', encoding='utf-8') as f:
               lines = f.readlines()
@@ -41,7 +42,10 @@ jobs:
 
           # 将结果写入新文件，例如保存为 Data/Random/TR-Random_443.txt
           with open('Data/Random/TR-Random_443.txt', 'w', encoding='utf-8') as f:
-              f.write('\n'.join(selected_ips) + '\n')
+              if selected_ips:
+                  f.write('\n'.join(selected_ips) + '\n')
+              else:
+                  f.write('') # 处理空列表情况，防止报错
           "
 
       # 3. 提交并推送到仓库
