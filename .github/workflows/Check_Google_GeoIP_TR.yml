@@ -1,0 +1,70 @@
+name: Check Google GeoIP and Filter TR
+
+on:
+  workflow_dispatch: 
+  schedule:
+    - cron: '0 1 * * *' # 每天北京时间早上 9:00 运行 (UTC 01:00)
+
+jobs:
+  check-ips:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check IP Location via YouTube and Filter TR
+        run: |
+          # 创建存放结果的目录
+          mkdir -p Data/Google
+          # 清空或初始化目标文件
+          > Data/Google/TR.txt
+          
+          # 读取你的源文件
+          cat Data/TR.txt | while read line || [[ -n $line ]]; do
+            
+            # 提取 IP:端口 用于测试
+            ip_port=$(echo "$line" | awk -F'#' '{print $1}')
+            ip=$(echo "$ip_port" | cut -d':' -f1)
+            
+            # 如果空行则跳过
+            if [ -z "$ip_port" ]; then
+              continue
+            fi
+
+            echo "正在测试: $ip_port ..."
+            
+            # 这里以优选IP（Cloudflare Edge IP）的测试方式为例（对应你图中的IP格式）
+            region=$(curl -s -m 10 --resolve www.youtube.com:443:$ip https://www.youtube.com | grep -oP '"GL":"\K[^"]+' | head -n 1)
+
+            if [ -n "$region" ]; then
+              echo "✅ $ip_port -> Google 识别地区: $region"
+              
+              # 【核心修改】判断如果识别结果是 TR，则将整行写入到目标文件
+              if [ "$region" == "TR" ]; then
+                echo "$line" >> Data/Google/TR.txt
+              fi
+              
+            else
+              echo "❌ $ip_port -> 访问超时或无法解析地区"
+            fi
+            
+          done
+          
+      - name: Show Results
+        run: |
+          echo "==== 筛选出 Google 归属地为 TR 的节点 ===="
+          cat Data/Google/TR.txt
+
+      - name: Commit and Push Results
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 将生成的文件添加到 git 暂存区
+          git add Data/Google/TR.txt
+          
+          # 提交更改 (如果没有更改则不会报错并继续)
+          git commit -m "Auto updated Google TR IPs" || exit 0
+          
+          # 推送到仓库
+          git push
