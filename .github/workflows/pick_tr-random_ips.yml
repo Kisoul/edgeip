@@ -36,8 +36,8 @@ jobs:
           # 随机抽取 10 个（如果不足 10 个则全选）
           selected_ips = random.sample(port_443_ips, min(10, len(port_443_ips)))
 
-          # 将结果写入新文件，例如保存为 Data/TR-Random_443.txt
-          with open('Data/TR-Random_443.txt', 'w', encoding='utf-8') as f:
+          # 将结果写入新文件，例如保存为 Data/Random/TR-Random_443.txt
+          with open('Data/Random/TR-Random_443.txt', 'w', encoding='utf-8') as f:
               f.write('\n'.join(selected_ips) + '\n')
           "
 
@@ -48,7 +48,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           
           # 添加新生成的文件
-          git add Data/TR-Random_443.txt
+          git add Data/Random/TR-Random_443.txt
           
           # 检查是否有文件改动，如果有则提交并推送
           if git diff --staged --quiet; then
