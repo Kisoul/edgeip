@@ -19,7 +19,7 @@ jobs:
           unzip -q Xray-linux-64.zip -d xray
           chmod +x xray/xray
 
-      - name: Check IP Location via Xray and Filter TR
+      - name: Check IP Location via Xray and Filter TW
         run: |
           mkdir -p Data/Google
           > Data/Google/TW.txt
@@ -109,13 +109,13 @@ jobs:
           
       - name: Show Results
         run: |
-          echo "==== 筛选出 Google 归属地为 TR 的节点 ===="
+          echo "==== 筛选出 Google 归属地为 TW 的节点 ===="
           cat Data/Google/TW.txt
 
       - name: Commit and Push Results
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add Data/Google/TR.txt
+          git add Data/Google/TW.txt
           git commit -m "Auto updated Google TW IPs" || exit 0
           git push
