@@ -1,4 +1,4 @@
-name: Check Google HKIP with Xray
+name: Check Google HK IP with Xray
 
 on:
   workflow_dispatch: 
