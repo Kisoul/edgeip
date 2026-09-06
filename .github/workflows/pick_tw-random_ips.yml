@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 运行 Python 脚本筛选并抽取 IP
+      # 2. 运行 Python 脚本筛选并抽取10个443端口的IP
       - name: Pick random 10 IPs with port 443
         run: |
           python -c "
