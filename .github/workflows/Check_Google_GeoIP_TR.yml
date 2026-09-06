@@ -34,7 +34,7 @@ jobs:
             echo "正在测试: $ip_port ..."
             
             # 这里以优选IP（Cloudflare Edge IP）的测试方式为例（对应你图中的IP格式）
-            region=$(curl -s -m 10 --resolve www.youtube.com:443:$ip https://www.youtube.com | grep -oP '"GL":"\K[^"]+' | head -n 1)
+            region=$(curl -s -m 15 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --resolve www.youtube.com:443:$ip https://www.youtube.com | grep -oP '"GL":"\K[^"]+' | head -n 1)
 
             if [ -n "$region" ]; then
               echo "✅ $ip_port -> Google 识别地区: $region"
