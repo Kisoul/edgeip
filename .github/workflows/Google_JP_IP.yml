@@ -19,7 +19,7 @@ jobs:
           unzip -q Xray-linux-64.zip -d xray
           chmod +x xray/xray
 
-      - name: Check IP Location via Xray and Filter TR
+      - name: Check IP Location via Xray and Filter JP
         run: |
           mkdir -p Data/Google
           > Data/Google/JP.txt
