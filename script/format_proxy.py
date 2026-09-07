@@ -3,34 +3,27 @@ import csv
 import hashlib
 import urllib.request
 
-
 # ============================================================
 # 基本配置
 # ============================================================
-
 SOURCE_URL = (
     "https://raw.githubusercontent.com/"
     "papapapapdelesia/Emilia/refs/heads/main/Data/alive.txt"
 )
-
 ROOT = Path(__file__).resolve().parent.parent
-
 DATA_DIR = ROOT / "Data"
+LATEST_DIR = DATA_DIR / "Latest"  # 新增：用于存放纯覆盖的新节点
 CACHE_DIR = ROOT / ".cache"
-
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 NEW_ALIVE = CACHE_DIR / "alive_new.txt"
 HASH_FILE = CACHE_DIR / "alive.sha256"
-
 # GitHub Actions 用它判断本次是否需要提交
 CHANGED_FILE = ROOT / "changed.txt"
-
 
 # ============================================================
 # 国家 / 地区代码映射
 # ============================================================
-
 COUNTRIES = {
     "AD": "安道尔",
     "AE": "阿联酋",
@@ -281,7 +274,6 @@ COUNTRIES = {
     "ZA": "南非",
     "ZM": "赞比亚",
     "ZW": "津巴布韦",
-
     # 上游偶尔可能出现非标准地区代码
     "T1": "未知地区",
 }
@@ -290,44 +282,34 @@ COUNTRIES = {
 # ============================================================
 # 下载 alive.txt
 # ============================================================
-
 def download_alive():
     print("正在下载上游 Emilia/Data/alive.txt ...")
-
     urllib.request.urlretrieve(
         SOURCE_URL,
         NEW_ALIVE,
     )
-
     print(f"下载完成：{NEW_ALIVE}")
 
 
 # ============================================================
 # 计算 SHA256
 # ============================================================
-
 def sha256_file(path):
     h = hashlib.sha256()
-
     with path.open("rb") as f:
         while True:
             chunk = f.read(1024 * 1024)
-
             if not chunk:
                 break
-
             h.update(chunk)
-
     return h.hexdigest()
 
 
 # ============================================================
 # 判断上游是否变化
 # ============================================================
-
 def check_upstream_changed():
     new_hash = sha256_file(NEW_ALIVE)
-
     if not HASH_FILE.exists():
         print("首次运行：没有历史 SHA256。")
         return True, new_hash
@@ -335,20 +317,18 @@ def check_upstream_changed():
     old_hash = HASH_FILE.read_text(
         encoding="utf-8"
     ).strip()
-
+    
     print(f"旧 SHA256：{old_hash}")
     print(f"新 SHA256：{new_hash}")
 
     if old_hash == new_hash:
         return False, new_hash
-
     return True, new_hash
 
 
 # ============================================================
 # 端口合法性
 # ============================================================
-
 def valid_port(port):
     try:
         port_num = int(port)
@@ -360,28 +340,21 @@ def valid_port(port):
 # ============================================================
 # 从旧 Data 文件中读取历史节点
 # ============================================================
-
 def load_old_data():
     """
     读取现有 Data/*.txt 历史节点。
-
     历史文件即使还是旧格式：
-    IP:PORT#地区码中文名,运营商
-
+      IP:PORT#地区码中文名,运营商
     也会在本次运行时自动清洗成：
-    IP:PORT#地区码中文名|IP
-
+      IP:PORT#地区码中文名|IP
     以 IP:端口 为唯一键。
     """
-
     regions = {}
-
     if not DATA_DIR.exists():
         print("Data 目录不存在，视为首次生成。")
         return regions
 
     print("正在读取并清洗历史地区文件...")
-
     file_count = 0
     node_count = 0
 
@@ -389,78 +362,66 @@ def load_old_data():
         # ALL.txt 只是汇总，不重复读取
         if path.name.upper() == "ALL.TXT":
             continue
-
+            
         code = path.stem.upper()
-        country_name = COUNTRIES.get(code, "未知地区")
-
+        country_name = COUNTRIES.get(
+            code,
+            "未知地区"
+        )
         regions.setdefault(code, {})
         file_count += 1
-
+        
         try:
             lines = path.read_text(
                 encoding="utf-8",
                 errors="ignore",
             ).splitlines()
-
+            
             for line in lines:
                 line = line.strip()
-
                 if not line:
                     continue
-
                 if "#" not in line:
                     continue
-
+                    
                 address = line.split("#", 1)[0].strip()
                 if not address:
                     continue
-
+                    
                 # 提取纯 IP (以冒号分割获取前半部分)
                 ip = address.split(":")[0]
-
+                
                 # 统一改成新的格式：IP:PORT#地区码中文名|IP
                 clean_line = f"{address}#{code}{country_name}|{ip}"
-
+                
                 regions[code][address] = clean_line
                 node_count += 1
-
+                
         except Exception as e:
             print(f"读取历史文件 {path.name} 失败：{e}")
-
-    print(
-        f"历史文件：{file_count} 个，"
-        f"历史节点：{node_count} 条"
+            
+    print(f"历史文件：{file_count} 个，"
+          f"历史节点：{node_count} 条"
     )
-
     return regions
 
 
 # ============================================================
 # 解析上游 alive.txt
 # ============================================================
-
 def load_new_data():
     """
     读取新的 alive.txt。
-
-    上游格式：
-    IP,端口,地区码,运营商
-
-    输出格式：
-    IP:端口#地区码中文地区名|IP
-
-    例如：
-    103.30.211.34:443#AU澳大利亚|103.30.211.34
+    上游格式： IP,端口,地区码,运营商
+    输出格式： IP:端口#地区码中文地区名|IP
+    例如： 103.30.211.34:443#AU澳大利亚|103.30.211.34
     """
-
     regions = {}
-
     raw_count = 0
     valid_count = 0
     invalid_count = 0
 
     print("正在解析新的 alive.txt ...")
-
     with NEW_ALIVE.open(
         "r",
         encoding="utf-8",
@@ -468,93 +429,78 @@ def load_new_data():
         newline="",
     ) as f:
         reader = csv.reader(f)
-
         for row in reader:
             raw_count += 1
-
             if len(row) < 3:
                 invalid_count += 1
                 continue
-
+                
             ip = row[0].strip()
             port = row[1].strip()
             code = row[2].strip().upper()
-
+            
             if not ip:
                 invalid_count += 1
                 continue
-
             if not valid_port(port):
                 invalid_count += 1
                 continue
-
             if not code:
                 invalid_count += 1
                 continue
-
+                
             address = f"{ip}:{port}"
-
             country_name = COUNTRIES.get(
                 code,
                 "未知地区",
             )
-
+            
             # 统一改成新的格式：IP:PORT#地区码中文名|IP
             line = f"{address}#{code}{country_name}|{ip}"
-
+            
             regions.setdefault(code, {})
-
             # 同一次上游内如果重复，按 IP:端口 自动去重
             regions[code][address] = line
-
             valid_count += 1
 
     print("----------------------------")
     print(f"上游原始行数：{raw_count}")
     print(f"有效行数：{valid_count}")
     print(f"无效行数：{invalid_count}")
-
     return regions
 
 
 # ============================================================
 # 合并历史 + 新数据
 # ============================================================
-
 def merge_data(old_regions, new_regions):
     """
-    方案2：
-
-    历史数据永久保留。
-
+    方案2： 历史数据永久保留。
     新数据：
-    - 不存在 → 新增
-    - IP:端口 已存在 → 保留统一后的新格式
-    - 上游本次没有出现 → 旧数据仍保留
+      - 不存在 → 新增
+      - IP:端口 已存在 → 保留统一后的新格式
+      - 上游本次没有出现 → 旧数据仍保留
     """
-
     merged = {}
-
+    
     # 复制历史数据
     for code, nodes in old_regions.items():
         merged.setdefault(code, {})
         merged[code].update(nodes)
-
+        
     added_count = 0
     updated_count = 0
     duplicate_count = 0
-
+    
     # 合并新数据
     for code, nodes in new_regions.items():
         merged.setdefault(code, {})
-
         for address, new_line in nodes.items():
             if address not in merged[code]:
                 merged[code][address] = new_line
                 added_count += 1
             else:
                 old_line = merged[code][address]
-
                 if old_line != new_line:
                     # 相同 IP:端口格式变化时，以新格式为准
                     merged[code][address] = new_line
@@ -566,79 +512,58 @@ def merge_data(old_regions, new_regions):
     print(f"新增节点：{added_count}")
     print(f"更新节点：{updated_count}")
     print(f"重复节点：{duplicate_count}")
-
     return merged
 
 
 # ============================================================
-# 写入所有地区文件
+# 写入所有地区文件 (修改为支持自定义目录)
 # ============================================================
-
-def write_data(regions):
+def write_data(regions, out_dir):
     """
-    不删除历史地区。
-
-    根据合并后的完整数据重新写入每个地区文件。
-
-    最后重新生成 ALL.txt。
+    根据传入的数据，写入到指定的目录。
     """
-
-    DATA_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
     all_lines = []
     region_count = 0
-
+    
     print("----------------------------")
-    print("正在生成地区文件...")
-
+    print(f"正在生成地区文件至 {out_dir.name} 目录...")
+    
     for code in sorted(regions.keys()):
         nodes = regions[code]
-
         if not nodes:
             continue
-
+            
         # 按 address 字符排序
         sorted_items = sorted(
             nodes.items(),
             key=lambda item: item[0],
         )
-
-        lines = [
-            line
-            for _, line in sorted_items
-        ]
-
-        output_file = DATA_DIR / f"{code}.txt"
-
+        lines = [line for _, line in sorted_items]
+        
+        output_file = out_dir / f"{code}.txt"
         output_file.write_text(
             "\n".join(lines) + "\n",
             encoding="utf-8",
         )
-
         all_lines.extend(lines)
-
         region_count += 1
-
-        print(
-            f"{code}.txt："
-            f"{len(lines)} 条"
+        
+        print(f"{code}.txt："
+              f"{len(lines)} 条"
         )
-
+        
     # ========================================================
     # 重新生成 ALL.txt
     # ========================================================
-
-    all_file = DATA_DIR / "ALL.txt"
-
+    all_file = out_dir / "ALL.txt"
     all_file.write_text(
         "\n".join(all_lines) + "\n",
         encoding="utf-8",
     )
-
     print("============================")
+    print(f"目录 {out_dir.name} 汇总完成：")
     print(f"地区数量：{region_count}")
     print(f"累计节点：{len(all_lines)}")
     print(f"汇总文件：{all_file}")
@@ -647,7 +572,6 @@ def write_data(regions):
 # ============================================================
 # 保存新 SHA256
 # ============================================================
-
 def save_hash(new_hash):
     HASH_FILE.write_text(
         new_hash + "\n",
@@ -658,7 +582,6 @@ def save_hash(new_hash):
 # ============================================================
 # 写 GitHub Actions 状态
 # ============================================================
-
 def set_changed(value):
     CHANGED_FILE.write_text(
         "true" if value else "false",
@@ -669,54 +592,55 @@ def set_changed(value):
 # ============================================================
 # 主程序
 # ============================================================
-
 def main():
     print("======================================")
     print("Proxy IP 自动同步整理")
     print("======================================")
-
+    
     # 1. 下载上游
     download_alive()
-
+    
     # 2. 检查上游是否有变化
     is_changed, new_hash = check_upstream_changed()
-
     if not is_changed:
         print("----------------------------")
         print("上游 alive.txt 没有变化。")
         print("本次不重新生成 Data 文件。")
-
         set_changed(False)
         return
-
+        
     print("----------------------------")
     print("检测到上游 alive.txt 已变化。")
-
+    
     # 3. 读取历史节点
     old_regions = load_old_data()
-
+    
     # 4. 读取本次上游节点
     new_regions = load_new_data()
-
+    
     # 5. 合并历史 + 新节点
     merged_regions = merge_data(
         old_regions,
         new_regions,
     )
+    
+    # 6. 生成第一套文件：【历史合并版】(输出到 Data 根目录，保持兼容)
+    print("\n>>> 正在生成【历史累计版】文件 <<<")
+    write_data(merged_regions, DATA_DIR)
 
-    # 6. 重新写地区文件 + ALL
-    write_data(merged_regions)
-
-    # 7. 更新 SHA256
+    # 7. 生成第二套文件：【纯新覆盖版】(输出到 Data/Latest 目录)
+    print("\n>>> 正在生成【全新覆盖版】文件 <<<")
+    write_data(new_regions, LATEST_DIR)
+    
+    # 8. 更新 SHA256
     save_hash(new_hash)
-
-    # 8. 通知 GitHub Actions
+    
+    # 9. 通知 GitHub Actions
     set_changed(True)
-
+    
     print("============================")
     print("本次同步整理完成。")
     print("============================")
-
 
 if __name__ == "__main__":
     main()
