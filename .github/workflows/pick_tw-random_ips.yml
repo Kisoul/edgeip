@@ -28,7 +28,7 @@ jobs:
           import os
           
           # 读取原始文件
-          with open('Data/Google/TW.txt', 'r', encoding='utf-8') as f:
+          with open('Data/Latest/Google/TW.txt', 'r', encoding='utf-8') as f:
               lines = f.readlines()
 
           # 筛选包含 ':443' 的行，去除空白字符
@@ -38,10 +38,10 @@ jobs:
           selected_ips = random.sample(port_443_ips, min(10, len(port_443_ips)))
 
           # 新增：创建目标目录（如果不存在）！！！
-          os.makedirs('Data/Random', exist_ok=True)
+          os.makedirs('Data/Latest/Random', exist_ok=True)
 
-          # 将结果写入新文件，例如保存为 Data/Random/TW-Random_443.txt
-          with open('Data/Random/TW-Random_443.txt', 'w', encoding='utf-8') as f:
+          # 将结果写入新文件，例如保存为 Data/Latest/Random/TW-Random_443.txt
+          with open('Data/Latest/Random/TW-Random_443.txt', 'w', encoding='utf-8') as f:
               if selected_ips:
                   f.write('\n'.join(selected_ips) + '\n')
               else:
@@ -55,7 +55,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           
           # 添加新生成的文件
-          git add Data/Random/TW-Random_443.txt
+          git add Data/Latest/Random/TW-Random_443.txt
           
           # 检查是否有文件改动，如果有则提交并推送
           if git diff --staged --quiet; then
