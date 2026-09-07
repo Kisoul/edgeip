@@ -62,5 +62,9 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Auto-update random 10 IPs with port 443"
+
+            # 【关键防冲突代码】在推送前先拉取合并其他国家脚本刚提交的代码
+            git pull --rebase origin main
+            
             git push
           fi
