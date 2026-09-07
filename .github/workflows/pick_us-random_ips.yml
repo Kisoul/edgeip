@@ -3,8 +3,8 @@ name: Daily Random Pick 443 US-IPs
 # 触发条件
 on:
   schedule:
-    # 每天 UTC 时间 00:00 (北京时间早上 8:00) 执行一次
-    - cron: '0 0 * * *'
+    # 每天 UTC 时间 17:00 (北京时间早上 1:00) 执行一次
+    - cron: '0 17 * * *' # 每天北京时间凌晨 01:00 运行 (UTC 17:00)
   workflow_dispatch: # 允许在 Actions 页面手动点击运行，方便测试
 
 # 赋予 GitHub Actions 推送代码的权限
