@@ -1,4 +1,4 @@
-name: Check Google SG IP with Xray
+name: Check Google SG IP with Xray (Fast)
 
 on:
   workflow_dispatch: 
@@ -19,9 +19,10 @@ jobs:
           unzip -q Xray-linux-64.zip -d xray
           chmod +x xray/xray
 
-      - name: Check IP Location via Xray and Filter SG
+      - name: Check IP Location via Xray (Concurrent)
         run: |
           mkdir -p Data/Latest/Google
+          mkdir -p tmp_results  # 创建临时文件夹存放多线程结果
           > Data/Latest/Google/SG.txt
           
           # ==========================================
@@ -30,82 +31,106 @@ jobs:
           UUID="8bfae153-9f0f-443d-8231-a4bffa7064ac"  
           SNI="edge.ileyee.com"                         
           HOST="edge.ileyee.com"                        
-          WS_PATH="/?ed=2560"    # 修复：重命名为 WS_PATH，绝对不再冲突系统变量！                             
+          WS_PATH="/?ed=2560"                                
           # ==========================================
           
+          COUNT=0
+          MAX_JOBS=20  # 并发线程数（建议 10-20 之间，太大可能导致 CPU 满载报错）
+
           while read -r line || [[ -n $line ]]; do
-            # 恢复干净整洁的截取方式
-            ip_port=$(echo "$line" | cut -d'#' -f1)
-            ip=$(echo "$ip_port" | cut -d':' -f1)
-            port=$(echo "$ip_port" | cut -d':' -f2)
+            ip_port="${line%%#*}"
+            ip="${ip_port%:*}"
+            port="${ip_port##*:}"
             
             if [ -z "$ip" ] || [ -z "$port" ]; then
               continue
             fi
 
-            echo "----------------------------------------"
-            echo "正在启动 Xray 测试: $ip_port ..."
-            
-            # 使用 echo 写入配置，将原本的 $PATH 替换为 $WS_PATH
-            echo "{
-              \"inbounds\": [{
-                \"port\": 10808,
-                \"listen\": \"127.0.0.1\",
-                \"protocol\": \"socks\",
-                \"settings\": { \"udp\": true }
-              }],
-              \"outbounds\": [{
-                \"protocol\": \"vless\",
-                \"settings\": {
-                  \"vnext\": [{
-                    \"address\": \"$ip\",
-                    \"port\": $port,
-                    \"users\": [{\"id\": \"$UUID\", \"encryption\": \"none\"}]
-                  }]
-                },
-                \"streamSettings\": {
-                  \"network\": \"ws\",
-                  \"security\": \"tls\",
-                  \"tlsSettings\": { \"serverName\": \"$SNI\" },
-                  \"wsSettings\": {
-                    \"path\": \"$WS_PATH\",
-                    \"headers\": { \"Host\": \"$HOST\" }
+            COUNT=$((COUNT + 1))
+            # 动态分配端口 (比如 10001, 10002) 避免冲突
+            LOCAL_PORT=$((10000 + COUNT))
+
+            # 把测试逻辑用括号包起来，并在末尾加 &，让它在后台单独运行
+            (
+              echo "启动并发测试 -> $ip_port (端口: $LOCAL_PORT)"
+              
+              config_file="config_${LOCAL_PORT}.json"
+              
+              echo "{
+                \"inbounds\": [{
+                  \"port\": $LOCAL_PORT,
+                  \"listen\": \"127.0.0.1\",
+                  \"protocol\": \"socks\",
+                  \"settings\": { \"udp\": true }
+                }],
+                \"outbounds\": [{
+                  \"protocol\": \"vless\",
+                  \"settings\": {
+                    \"vnext\": [{
+                      \"address\": \"$ip\",
+                      \"port\": $port,
+                      \"users\": [{\"id\": \"$UUID\", \"encryption\": \"none\"}]
+                    }]
+                  },
+                  \"streamSettings\": {
+                    \"network\": \"ws\",
+                    \"security\": \"tls\",
+                    \"tlsSettings\": { \"serverName\": \"$SNI\" },
+                    \"wsSettings\": {
+                      \"path\": \"$WS_PATH\",
+                      \"headers\": { \"Host\": \"$HOST\" }
+                    }
                   }
-                }
-              }]
-            }" > config.json
+                }]
+              }" > $config_file
 
-            # 后台启动 Xray
-            ./xray/xray -c config.json > /dev/null 2>&1 &
-            XRAY_PID=$!
-            
-            # 等待 2 秒让 Xray 启动并建立连接 (现在 sleep 绝对能找到了)
-            sleep 2 
-            
-            # 使用 curl 访问 YouTube
-            response=$(curl -s -i -m 10 -x socks5h://127.0.0.1:10808 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.youtube.com || true)
-            
-            # 提取状态码和归属地
-            http_code=$(echo "$response" | head -n 1 | cut -d' ' -f2 | tr -d '\r')
-            region=$(echo "$response" | grep -oP '"GL":"\K[^"]+' | head -n 1)
-
-            if [ -n "$region" ]; then
-              echo "✅ $ip_port -> 成功! Google 识别地区: $region (状态码: $http_code)"
-              if [ "$region" == "SG" ]; then
-                echo "$line" >> Data/Latest/Google/SG.txt
+              ./xray/xray -c $config_file > /dev/null 2>&1 &
+              XRAY_PID=$!
+              
+              sleep 2 
+              
+              response=$(curl -s -i -m 10 -x socks5h://127.0.0.1:$LOCAL_PORT -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.youtube.com || true)
+              
+              read -r proto http_code rest <<< "$response"
+              http_code="${http_code%$'\r'}"
+              
+              region=""
+              if [[ "$response" =~ \"GL\":\"([^\"]+)\" ]]; then
+                region="${BASH_REMATCH[1]}"
               fi
-            else
-              if [ -z "$http_code" ]; then
-                echo "❌ $ip_port -> 测试失败: 代理不通或严重超时"
+
+              if [ -n "$region" ]; then
+                echo "✅ $ip_port -> 成功! 地区: $region (状态码: $http_code)"
+                
+                # 如果是你想要的地区，写入到独占的临时文件里
+                if [ "$region" == "SG" ]; then
+                  echo "$line" >> tmp_results/SG_${LOCAL_PORT}.txt
+                fi
               else
-                echo "⚠️ $ip_port -> 测试失败，HTTP 状态码: $http_code"
+                if [ -z "$http_code" ]; then
+                  echo "❌ $ip_port -> 测试失败: 代理不通或严重超时"
+                else
+                  echo "⚠️ $ip_port -> 测试失败，HTTP 状态码: $http_code"
+                fi
               fi
+              
+              kill -9 $XRAY_PID 2>/dev/null || true
+              rm -f $config_file
+            ) &  # <-- 这里的 & 是灵魂，它让任务在后台跑，立刻继续读取下一个 IP
+
+            # 控制并发数量：如果后台已经堆积了 20 个任务，就用 wait 停下来等它们测完
+            if (( COUNT % MAX_JOBS == 0 )); then
+              wait
             fi
             
-            # 测完杀掉 Xray 进程，准备测下一个
-            kill -9 $XRAY_PID 2>/dev/null || true
-            sleep 1
           done < Data/Latest/SG.txt
+          
+          # 等待最后一批任务彻底执行完毕
+          wait 
+          
+          # 把所有临时结果文件合并成一个最终文件
+          cat tmp_results/SG*.txt > Data/Latest/Google/SG.txt 2>/dev/null || true
+          rm -rf tmp_results
           
       - name: Show Results
         run: |
