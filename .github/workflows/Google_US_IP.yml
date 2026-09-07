@@ -104,7 +104,7 @@ jobs:
                 
                 # 如果是你想要的地区，写入到独占的临时文件里
                 if [ "$region" == "US" ]; then
-                  echo "$line" >> tmp_results/TR_${LOCAL_PORT}.txt
+                  echo "$line" >> tmp_results/US_${LOCAL_PORT}.txt
                 fi
               else
                 if [ -z "$http_code" ]; then
@@ -141,6 +141,6 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add Data/Google/TR.txt
+          git add Data/Google/US.txt
           git commit -m "Auto updated Google TR IPs" || exit 0
           git push
