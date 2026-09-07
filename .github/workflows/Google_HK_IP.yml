@@ -21,8 +21,8 @@ jobs:
 
       - name: Check IP Location via Xray and Filter HK
         run: |
-          mkdir -p Data/Google
-          > Data/Google/HK.txt
+          mkdir -p Data/Latest/Google
+          > Data/Latest/Google/HK.txt
           
           # ==========================================
           # ⚠️⚠️⚠️ 请在这里填入你真实的节点信息 ⚠️⚠️⚠️
@@ -92,7 +92,7 @@ jobs:
             if [ -n "$region" ]; then
               echo "✅ $ip_port -> 成功! Google 识别地区: $region (状态码: $http_code)"
               if [ "$region" == "HK" ]; then
-                echo "$line" >> Data/Google/HK.txt
+                echo "$line" >> Data/Latest/Google/HK.txt
               fi
             else
               if [ -z "$http_code" ]; then
@@ -105,17 +105,17 @@ jobs:
             # 测完杀掉 Xray 进程，准备测下一个
             kill -9 $XRAY_PID 2>/dev/null || true
             sleep 1
-          done < Data/HK.txt
+          done < Data/Latest/HK.txt
           
       - name: Show Results
         run: |
           echo "==== 筛选出 Google 归属地为 HK 的节点 ===="
-          cat Data/Google/HK.txt
+          cat Data/Latest/Google/HK.txt
 
       - name: Commit and Push Results
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add Data/Google/HK.txt
+          git add Data/Latest/Google/HK.txt
           git commit -m "Auto updated Google HK IPs" || exit 0
           git push
