@@ -41,7 +41,7 @@ jobs:
           os.makedirs('Data/Latest/Random', exist_ok=True)
 
           # 将结果写入新文件，例如保存为 Data/Latest/Random/TR-Random_443.txt
-          with open('Data/Random/TR-Random_443.txt', 'w', encoding='utf-8') as f:
+          with open('Data/Latest/Random/TR-Random_443.txt', 'w', encoding='utf-8') as f:
               if selected_ips:
                   f.write('\n'.join(selected_ips) + '\n')
               else:
